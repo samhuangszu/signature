@@ -27,7 +27,6 @@ export function Sign(obj, method, timeStamp) {
                 newO[k] = sortKey(newO[k])
             }
         }
-
         return newO
     }
 
