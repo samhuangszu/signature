@@ -1,7 +1,18 @@
 var md5 = require('./md5.js')
-export function Sign(obj, method, timeStamp) {
-    if (!obj) {
-        obj = ''
+import { isObject } from './object'
+/*
+* sign 对请求参数进行签名
+* param url:请求的路径，获取queryString
+* param data:发送的数据，必须为对象或null
+* param contentType: 为json发送时，data发送前必须转为string
+* param timeStamp:时间截
+* param key:加密密钥，这里做了一次md5
+* return {string}
+*/
+export function sign(url, data, contentType, timeStamp, key = "") {
+    let obj = {}
+    if (isObject(data)) {
+        Object.assign(obj, data)
     }
     function sortKey(o) {
         let arr = Object.keys(o)
@@ -14,10 +25,8 @@ export function Sign(obj, method, timeStamp) {
         for (let k in newO) {
             if (newO[k] instanceof Array) {
                 newO[k] = newO[k].sort()
-                // console.log(newO[k])
                 newO[k].map((tmp, index) => {
                     if (tmp instanceof Object) {
-                        // console.log(tmp)
                         newO[k][index] = sortKey(tmp)
                     }
                 })
@@ -29,26 +38,49 @@ export function Sign(obj, method, timeStamp) {
         }
         return newO
     }
-
-    let key = ''
-    let json = sortKey(obj)
-    // post原样处理
-    // get方法取对象第一层排序
-    if (method.toUpperCase() == 'POST') {
+    function queryObj(url) {
+        if (!url) {
+            return {}
+        }
+        if (url.indexOf("?") == -1) {
+            return {}
+        }
+        url = url.split("?")[1];
+        const urlObj = {}
+        let urlArr = url.split('&')
+        urlArr.forEach((item) => {
+            let urlItem = item.split('=')
+            Object.assign(urlObj, {
+                [urlItem[0]]: decodeURIComponent(urlItem[1])
+            })
+        })
+        return urlObj
+    }
+    let content = ''
+    // contentType: application/json,application/javascript
+    let ct = contentType.toLocaleLowerCase()
+    if (ct.indexOf('application/json') != -1 ||
+        ct.indexOf('application/javascript') != -1) {
+        let json = sortKey(obj)
         if (JSON.stringify(json) === '{}') {
-            key = `${timeStamp}`
+            content = `${timeStamp}`
         } else {
-            key = `${JSON.stringify(json)}${timeStamp}`
+            content = `${JSON.stringify(json)}${timeStamp}`
+        }
+        let qstr = JSON.stringify(sortKey(queryObj(url)))
+        if (qstr !== '{}') {
+            content = `${qstr}${content}`
         }
     } else {
-        let str = ''
+        Object.assign(obj, queryObj(url))
+        let json = sortKey(obj)
         for (let k in json) {
-            str += `${k}=${json[k]}&`
+            content += `${encodeURIComponent(k)}=${encodeURIComponent(json[k])}&`
         }
-        let arr = str.split('&')
-        arr.length -= 1
-        key = `${arr.join('&')}${timeStamp}`
+        content = `${content.substr(0, content.length - 1)}${timeStamp}`
     }
-    let sign = md5(key, '0f90529eeccc1539b5cf6f0101a97ff2')
-    return sign
+    key = `${key}${timeStamp}`
+    key = md5(key).toLocaleLowerCase()
+    let sign = md5(content, key)
+    return sign.toLocaleLowerCase()
 }
