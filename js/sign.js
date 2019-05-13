@@ -31,8 +31,7 @@ export function sign(url, data, contentType, timeStamp, key = "") {
                     }
                 })
             }
-
-            if (newO[k] instanceof Object) {
+            if (newO[k] instanceof Object && !(newO[k] instanceof Array)) {
                 newO[k] = sortKey(newO[k])
             }
         }
